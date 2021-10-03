@@ -1,5 +1,6 @@
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
 
 public class MatrixService {
 
@@ -21,11 +22,21 @@ public class MatrixService {
          */
         public ColumnSummator(int fromColumn, int toColumn, int[][] matrix) {
             // should be implemented
+            this.fromColumn = fromColumn;
+            this.toColumn = toColumn;
+            this.matrix = matrix;
         }
 
         @Override
         public Integer call() {
-            // should be implemented
+            Integer result = 0;
+            while (fromColumn <= toColumn) {
+                for(int i = 0; i < matrix.length; i++) {
+                    result += matrix[i][fromColumn];
+                }
+                ++fromColumn;
+            }
+            return result;
         }
     }
 
@@ -38,12 +49,48 @@ public class MatrixService {
      */
     public int sum(int[][] matrix, int nthreads) {
 
-        ExecutorService executorService = ...;
+        if (matrix.length == 0) {
+            return 0;
+        }
 
-        // create threads and divide work between them
-        // should be implemented
+        ExecutorService executorService = Executors.newFixedThreadPool(nthreads);
+        List<Future> futureList = new ArrayList<>();
+        int fromColumn = 0;
+
+        int partsCount;
+        if (nthreads > matrix[0].length) {
+            partsCount = matrix[0].length;
+        } else {
+            partsCount = matrix[0].length / nthreads;
+        }
+
+        int toColumn = fromColumn + partsCount - 1;
+
+        for (int i = 0; i < nthreads; i++) {
+            ColumnSummator columnSummator = new ColumnSummator(fromColumn, toColumn, matrix);
+            futureList.add(executorService.submit(columnSummator));
+
+            fromColumn = toColumn + 1;
+
+            if (matrix[0].length <= toColumn + matrix.length / partsCount) {
+                toColumn = matrix[0].length - 1;
+            } else {
+                toColumn = toColumn + matrix.length / partsCount;
+            };
+        }
 
         int sum = 0;
+        for (Future future: futureList) {
+            try {
+                sum += (Integer) future.get();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            }
+        }
+        executorService.shutdown();
+
         return sum;
     }
 }
